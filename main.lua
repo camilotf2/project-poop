@@ -133,12 +133,6 @@ do -- Combat Tab
         Text = 'Target parts',
         Tooltip = '',
     })
-
-    GunMods:AddToggle('NoRecoil', {
-        Text = 'No recoil',
-        Default = false,
-        Tooltip = '',
-    })
 end
 
 do -- Visuals Tab
@@ -182,18 +176,6 @@ do -- Visuals Tab
         Default = false,
         Tooltip = '',
     })
-
-    World:AddToggle('NoFog', {
-        Text = 'No fog',
-        Default = false,
-        Tooltip = '',
-    })
-    World:AddToggle('FullBright', {
-        Text = 'Full bright',
-        Default = false,
-        Tooltip = '',
-    })
-
 end
 
 do -- Misc Tab
