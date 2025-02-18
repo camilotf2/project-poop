@@ -464,7 +464,7 @@ do
 end
 end
 
-game:GetService("RunService").RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function()
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer then
             if not Visuals.Drawings[Player] then
