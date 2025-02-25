@@ -20,29 +20,38 @@ local Utils = {}
 do
     Utils.GetClosestPlayerToMouse = function()
         local MousePosition = UserInputService:GetMouseLocation()
-        local Closest, ClosestDistance = nil,math.huge
-
-            for _,Player in Players:GetPlayers() do
-                if Player == LocalPlayer or not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then
-                    continue
-                end 
-
+        local Closest, ClosestDistance = nil, math.huge
+    
+        for _, Player in Players:GetPlayers() do
+            if Player == LocalPlayer or not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then
+                continue
+            end
+    
             local Root = Player.Character:FindFirstChild("HumanoidRootPart")
             local ScreenPos, OnScreen = Camera:WorldToViewportPoint(Root.Position)
-
+    
             if not OnScreen then continue end
+    
+            local Direction = (Root.Position - Camera.CFrame.Position).Unit * 5000
+            local RaycastParams = RaycastParams.new()
+            RaycastParams.FilterDescendantsInstances = {Character}
+            RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+		    local Ray = workspace:Raycast(Camera.CFrame.Position, Direction, RaycastParams)
 
-            local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePosition).Magnitude
-            
-            if Distance > Fov.Radius then continue end
-
-            if Distance < ClosestDistance then
-                Closest = Player.Character
-                ClosestDistance = Distance
+            if Ray and Ray.Instance:IsDescendantOf(Player.Character) then
+                local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePosition).Magnitude
+    
+                if Distance > Fov.Radius then continue end
+    
+                if Distance < ClosestDistance then
+                    Closest = Player.Character
+                    ClosestDistance = Distance
+                end
             end
         end
-
-    return Closest
+    
+        return Closest
     end
 
     Utils.GetAmmoInfo = function(Ammo)
@@ -114,6 +123,12 @@ do -- Combat Tab
         Tooltip = '',
     })
 
+    SilentAimBox:AddToggle('BringTarget', {
+        Text = 'Bring target',
+        Default = false,
+        Tooltip = '',
+    })
+
     SilentAimBox:AddSlider('SilentAimFovSize', {
         Text = 'FOV Size',
         Default = 300,
@@ -131,6 +146,12 @@ do -- Combat Tab
         Default = 1,
         Multi = true,
         Text = 'Target parts',
+        Tooltip = '',
+    })
+
+    GunMods:AddToggle('NoRecoil', {
+        Text = 'No recoil',
+        Default = false,
         Tooltip = '',
     })
 end
@@ -176,6 +197,18 @@ do -- Visuals Tab
         Default = false,
         Tooltip = '',
     })
+
+    World:AddToggle('NoFog', {
+        Text = 'No fog',
+        Default = false,
+        Tooltip = '',
+    })
+    World:AddToggle('FullBright', {
+        Text = 'Full bright',
+        Default = false,
+        Tooltip = '',
+    })
+
 end
 
 do -- Misc Tab
@@ -191,13 +224,16 @@ do -- Misc Tab
 
     Miscbox:AddSlider('InvisibleOffSet', {
         Text = 'Position Offset',
-        Default = 3,
+        Default = 2,
         Min = 0,
-        Max = 3,
+        Max = 2.8,
         Rounding = 1,
         Compact = false,
         Tooltip = 'Determines how far underground you go',
     })
+
+    Miscbox:AddLabel('Above 2 gets buggy')
+    Miscbox:AddLabel('Do not crouch while invisible')
 end
 
 do -- Settings Tab
@@ -480,7 +516,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 local Track = Instance.new("Animation")
-Track.AnimationId = "rbxassetid://10714003221"
+Track.AnimationId = "rbxassetid://10147821284"
 local Animation
 RunService.Heartbeat:Connect(function()
     if not Toggles.Invisible.Value then
@@ -495,19 +531,21 @@ RunService.Heartbeat:Connect(function()
         Animation = Character:FindFirstChild('Humanoid'):LoadAnimation(Track)
     end
     Animation:Play(0, 1, 0)
-    Animation.TimePosition = 1.48
+    Animation.TimePosition = 1.89
 
 
     if Character and Character:FindFirstChild('HumanoidRootPart') then
         local OldHrp = Character.HumanoidRootPart.CFrame
         local oldVel = Character.HumanoidRootPart.AssemblyLinearVelocity
-        Character.HumanoidRootPart.CFrame = OldHrp - Vector3.new(0, Options.InvisibleOffSet.Value, 0)
+        Character.HumanoidRootPart.CFrame -= Vector3.new(0, Options.InvisibleOffSet.Value, 0)
+        Character.HumanoidRootPart.CFrame = Character.HumanoidRootPart.CFrame * CFrame.Angles(0, 0, math.pi)
         RunService.RenderStepped:Wait()
         Character.HumanoidRootPart.CFrame = OldHrp
         Character.HumanoidRootPart.AssemblyLinearVelocity = oldVel
+        Camera.CFrame += Vector3.new(0, Options.InvisibleOffSet.Value, 0)
+
     end
 end)
-
 local OldCreateBullet
 OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponModel, playerData, firePosition, ...)
     local Ammo = Utils.GetAmmoInfo(select(2, ...))
@@ -526,6 +564,20 @@ OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponMo
     end
 
     local Prediction = Utils.PredictVelocity(Closest[TargetPart], Ammo:GetAttribute('MuzzleVelocity'))
+    
+    local InitialPosition = Closest[TargetPart].Position
+
+	--[[if Toggles.BringTarget.Value then
+		task.spawn(function()
+			local Time = tick() + 1
+			while tick() < Time do
+				Closest[TargetPart].CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 1, -5)
+				task.wait()
+			end
+
+			Closest[TargetPart].CFrame = CFrame.new(InitialPosition)
+		end)
+	end]]
 
     firePosition.CFrame = CFrame.new(
         firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value, 0) or Vector3.new(0, 0, 0)),
@@ -534,4 +586,3 @@ OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponMo
 
     return OldCreateBullet(_, weapon, weaponModel, playerData, firePosition, ...)
 end)
-
