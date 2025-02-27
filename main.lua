@@ -1,3 +1,6 @@
+--https://discord.gg/aGYKCdXnPm
+
+
 local Services = setmetatable({}, {__index = function(_, k) return cloneref(game:GetService(k)) end})
 
 local Workspace = Services.Workspace
@@ -13,6 +16,8 @@ local ReplicatedStorage = Services.ReplicatedStorage
 
 local Bullet = require(ReplicatedStorage.Modules.FPS.Bullet)
 local AmmoTypes = ReplicatedStorage.AmmoTypes
+local Detections = {10,13,8}
+
 
 local Fov = Drawing.new("Circle") Fov.Thickness, Fov.NumSides, Fov.Filled, Fov.Color = 1.5, 360, false, Color3.fromRGB(255, 255, 255)
 
@@ -123,8 +128,8 @@ do -- Combat Tab
         Tooltip = '',
     })
 
-    SilentAimBox:AddToggle('BringTarget', {
-        Text = 'Bring target',
+    SilentAimBox:AddToggle('FreezeTarget', {
+        Text = 'Freeze target',
         Default = false,
         Tooltip = '',
     })
@@ -233,7 +238,7 @@ do -- Misc Tab
     })
 
     Miscbox:AddLabel('Above 2 gets buggy')
-    Miscbox:AddLabel('Do not crouch while invisible')
+    Miscbox:AddLabel('Do not crouch while invisible') 
 end
 
 do -- Settings Tab
@@ -530,22 +535,39 @@ RunService.Heartbeat:Connect(function()
     if not Animation and Character:FindFirstChild('Humanoid') then
         Animation = Character:FindFirstChild('Humanoid'):LoadAnimation(Track)
     end
-    Animation:Play(0, 1, 0)
-    Animation.TimePosition = 1.89
+    pcall(function()
+        Animation:Play(0, 1, 0)
+        Animation.TimePosition = 1.89
+    end)
 
 
     if Character and Character:FindFirstChild('HumanoidRootPart') then
         local OldHrp = Character.HumanoidRootPart.CFrame
         local oldVel = Character.HumanoidRootPart.AssemblyLinearVelocity
         Character.HumanoidRootPart.CFrame -= Vector3.new(0, Options.InvisibleOffSet.Value, 0)
-        Character.HumanoidRootPart.CFrame = Character.HumanoidRootPart.CFrame * CFrame.Angles(0, 0, math.pi)
+        Character.HumanoidRootPart.CFrame *= CFrame.Angles(0, 0, math.pi)
         RunService.RenderStepped:Wait()
         Character.HumanoidRootPart.CFrame = OldHrp
         Character.HumanoidRootPart.AssemblyLinearVelocity = oldVel
-        Camera.CFrame += Vector3.new(0, Options.InvisibleOffSet.Value, 0)
+        Camera.CFrame += Vector3.new(0, Options.InvisibleOffSet.Value + math.pi, 0)
 
     end
 end)
+
+--Hookers
+
+local Bypass;
+Bypass = hookmetamethod(game,"__namecall", function(self, ...)
+        if getnamecallmethod() == "FireServer" and self.Name == 'ProjectileInflict' then
+            local Args = {...}
+            if table.find(Detections, Args[3]) then
+                print('Prevented detection')
+                return coroutine.yield()
+            end
+        end
+    return Bypass(self, ...)
+end)
+
 local OldCreateBullet
 OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponModel, playerData, firePosition, ...)
     local Ammo = Utils.GetAmmoInfo(select(2, ...))
@@ -563,25 +585,27 @@ OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponMo
         return OldCreateBullet(_, weapon, weaponModel, playerData, firePosition, ...)
     end
 
-    local Prediction = Utils.PredictVelocity(Closest[TargetPart], Ammo:GetAttribute('MuzzleVelocity'))
-    
-    local InitialPosition = Closest[TargetPart].Position
-
-	--[[if Toggles.BringTarget.Value then
+	if Toggles.FreezeTarget.Value then
 		task.spawn(function()
 			local Time = tick() + 1
 			while tick() < Time do
-				Closest[TargetPart].CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 1, -5)
+				Closest.PrimaryPart.Anchored = true
 				task.wait()
 			end
 
-			Closest[TargetPart].CFrame = CFrame.new(InitialPosition)
+			Closest.PrimaryPart.Anchored = false
 		end)
-	end]]
+	end
+
+
+    local Prediction
+    if not Toggles.FreezeTarget.Value then
+        Prediction = Utils.PredictVelocity(Closest[TargetPart], Ammo:GetAttribute('MuzzleVelocity'))
+    end
 
     firePosition.CFrame = CFrame.new(
-        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value, 0) or Vector3.new(0, 0, 0)),
-        Prediction
+        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value - 3, 0) or Vector3.new(0, 0, 0)),
+        Prediction or Closest[TargetPart].Position
     )
 
     return OldCreateBullet(_, weapon, weaponModel, playerData, firePosition, ...)
