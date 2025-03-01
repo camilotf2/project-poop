@@ -1,6 +1,5 @@
 --https://discord.gg/aGYKCdXnPm
 
-
 local Services = setmetatable({}, {__index = function(_, k) return cloneref(game:GetService(k)) end})
 
 local Workspace = Services.Workspace
@@ -13,13 +12,16 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local RunService = Services.RunService
 local UserInputService = Services.UserInputService
 local ReplicatedStorage = Services.ReplicatedStorage
+local Lighting = Services.Lighting
 
 local Bullet = require(ReplicatedStorage.Modules.FPS.Bullet)
 local AmmoTypes = ReplicatedStorage.AmmoTypes
-local Detections = {10,13,8}
+local Detections = {10,13,8,9}
 
 
 local Fov = Drawing.new("Circle") Fov.Thickness, Fov.NumSides, Fov.Filled, Fov.Color = 1.5, 360, false, Color3.fromRGB(255, 255, 255)
+local Indicator = Drawing.new('Text') Indicator.Center = true Indicator.Size = 15 Indicator.Font = 2 Indicator.Color = Color3.fromRGB(255, 255, 255) Indicator.Outline = true
+local Snap = Drawing.new('Line') Snap.Thickness = 2.5 Snap.Color = Color3.fromRGB(255, 255, 255) Snap.Visible = false
 
 local Utils = {}
 do
@@ -122,6 +124,12 @@ do -- Combat Tab
         Tooltip = '',
     }):AddKeyPicker('SilentAimBind', { Default = 'C', NoUI = false, Text = 'Silent Aim', SyncToggleState = true})
 
+    SilentAimBox:AddToggle('Indicator', {
+        Text = 'Indicator',
+        Default = false,
+        Tooltip = '',
+    })
+
     SilentAimBox:AddToggle('SilentAimFov', {
         Text = 'Show FOV',
         Default = false,
@@ -203,6 +211,20 @@ do -- Visuals Tab
         Tooltip = '',
     })
 
+    EspBox:AddLabel(' ')
+
+    EspBox:AddToggle('SnapLines', {
+        Text = 'Snap lines',
+        Default = false,
+        Tooltip = '',
+    })
+
+    EspBox:AddToggle('HighlightTarget', {
+        Text = 'Highlight target',
+        Default = false,
+        Tooltip = '',
+    })
+
     World:AddToggle('NoFog', {
         Text = 'No fog',
         Default = false,
@@ -220,6 +242,7 @@ do -- Misc Tab
     local Tab = Window:AddTab('Misc')
 
     local Miscbox = Tab:AddLeftGroupbox('Misc')
+    local Character = Tab:AddRightGroupbox('Character')
 
     Miscbox:AddToggle('Invisible', {
         Text = 'Invisible',
@@ -239,6 +262,37 @@ do -- Misc Tab
 
     Miscbox:AddLabel('Above 2 gets buggy')
     Miscbox:AddLabel('Do not crouch while invisible') 
+
+
+    Character:AddToggle('Wsenabled', {
+        Text = 'Enabled',
+        Default = false,
+        Tooltip = '',
+    })
+    Character:AddSlider('WalkSpeed', {
+        Text = 'Walkspeed',
+        Default = 18,
+        Min = 0,
+        Max = 25,
+        Rounding = 0,
+        Compact = false,
+        Tooltip = '',
+    })
+
+    Character:AddToggle('Jpenabled', {
+        Text = 'Enabled',
+        Default = false,
+        Tooltip = '',
+    })
+    Character:AddSlider('Jumppowe1r', {
+        Text = 'Jump power',
+        Default = 5,
+        Min = 0,
+        Max = 10,
+        Rounding = 0,
+        Compact = false,
+        Tooltip = '',
+    })
 end
 
 do -- Settings Tab
@@ -272,90 +326,81 @@ local Visuals = {
 
 do
     function Visuals:Make(Properties)
-        if Properties and Properties.Player then
-            local Self = setmetatable({
-                Player = Properties.Player,
-                Drawings = {
-                    Name = Drawing.new("Text"),
-                    BoxOutline = Drawing.new("Square"),
-                    Box = Drawing.new("Square"),
-                    BoxFill = Drawing.new("Square"),
-                    HpBarOutline = Drawing.new("Square"),
-                    Hpbar = Drawing.new("Square"),
-                    HealthText = Drawing.new("Text"),
-                    Distance = Drawing.new("Text"),
-                    Highlight = Instance.new("Highlight", gethui())
-                }
-            }, {
-                __index = Visuals
-            })
-            
-            local Box, BoxFill, BoxOutline = Self.Drawings.Box, Self.Drawings.BoxFill, Self.Drawings.BoxOutline
-            BoxFill.Visible = false
-            BoxFill.Transparency = 0.4
-            BoxFill.Color = Color3.fromRGB(255, 255, 255)
-            BoxFill.ZIndex = 3
+        if not (Properties and Properties.Player) then return end
 
-            Box.Thickness = 0.8
-            Box.Filled = false
-            Box.Color = Color3.fromRGB(255, 255, 255)
-            Box.Visible = false
-            Box.ZIndex = 5
+        local Self = setmetatable({
+            Player = Properties.Player,
+            Drawings = {
+                Name = Drawing.new("Text"),
+                BoxOutline = Drawing.new("Square"),
+                Box = Drawing.new("Square"),
+                BoxFill = Drawing.new("Square"),
+                HpBarOutline = Drawing.new("Square"),
+                Hpbar = Drawing.new("Square"),
+                HealthText = Drawing.new("Text"),
+                Distance = Drawing.new("Text"),
+                Highlight = Instance.new("Highlight", gethui())
+            }
+        }, { __index = Visuals })
 
-            BoxOutline.Thickness = 2.8
-            BoxOutline.Filled = false
-            BoxOutline.Color = Color3.fromRGB(0, 0, 0)
-            BoxOutline.Visible = false
-            BoxOutline.ZIndex = 1
+        local draw = Self.Drawings
+        draw.BoxFill.Visible = false
+        draw.BoxFill.Transparency = 0.4
+        draw.BoxFill.Color = Color3.fromRGB(255, 255, 255)
+        draw.BoxFill.ZIndex = 3
 
-            local Name = Self.Drawings.Name
-            Name.Text = Self.Player.Name
-            Name.Center = true
-            Name.Size = 16
-            Name.Font = 2
-            Name.Visible = false
-            Name.Outline = true
-            Name.Color = Color3.fromRGB(255, 255, 255)
+        draw.Box.Thickness = 0.8
+        draw.Box.Filled = false
+        draw.Box.Color = Color3.fromRGB(255, 255, 255)
+        draw.Box.Visible = false
+        draw.Box.ZIndex = 5
 
-            local HpBarOutline = Self.Drawings.HpBarOutline
-            HpBarOutline.Thickness = 1.5
-            HpBarOutline.Filled = true
-            HpBarOutline.Visible = false
-            HpBarOutline.Color = Color3.fromRGB(0, 0, 0)
+        draw.BoxOutline.Thickness = 2.8
+        draw.BoxOutline.Filled = false
+        draw.BoxOutline.Color = Color3.fromRGB(0, 0, 0)
+        draw.BoxOutline.Visible = false
+        draw.BoxOutline.ZIndex = 1
 
-            local Hpbar = Self.Drawings.Hpbar
-            Hpbar.Thickness = 1.5
-            Hpbar.Filled = true
-            Hpbar.Visible = false
+        draw.Name.Text = Self.Player.Name
+        draw.Name.Center = true
+        draw.Name.Size = 16
+        draw.Name.Font = 2
+        draw.Name.Visible = false
+        draw.Name.Outline = true
+        draw.Name.Color = Color3.fromRGB(255, 255, 255)
 
-            local Hptext = Self.Drawings.HealthText
-            Hptext.Text = "0"
-            Hptext.Center = true
-            Hptext.Size = 13
-            Hptext.Font = 2
-            Hptext.Visible = false
-            Hptext.Outline = true
+        draw.HpBarOutline.Thickness = 1.5
+        draw.HpBarOutline.Filled = true
+        draw.HpBarOutline.Visible = false
+        draw.HpBarOutline.Color = Color3.fromRGB(0, 0, 0)
 
-            local Distance = Self.Drawings.Distance
-            Distance.Text = "0 s"
-            Distance.Center = true
-            Distance.Size = 16
-            Distance.Font = 2
-            Distance.Visible = false
-            Distance.Outline = true
+        draw.Hpbar.Thickness = 1.5
+        draw.Hpbar.Filled = true
+        draw.Hpbar.Visible = false
 
-            local Highlight = Self.Drawings.Highlight
-            Highlight.Enabled = false
-            Highlight.Adornee = Utils.GetCharacter(Self.Player)
-            Highlight.FillColor = Color3.fromRGB(255, 255, 255)
-            Highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
-            Highlight.FillTransparency = 0.5
-            Highlight.OutlineTransparency = 0
+        draw.HealthText.Text = "0"
+        draw.HealthText.Center = true
+        draw.HealthText.Size = 13
+        draw.HealthText.Font = 2
+        draw.HealthText.Visible = false
+        draw.HealthText.Outline = true
 
-            Visuals.Drawings[Properties.Player] = Self
+        draw.Distance.Text = "0 s"
+        draw.Distance.Center = true
+        draw.Distance.Size = 16
+        draw.Distance.Font = 2
+        draw.Distance.Visible = false
+        draw.Distance.Outline = true
 
-            return Self
-        end
+        draw.Highlight.Enabled = false
+        draw.Highlight.Adornee = Utils.GetCharacter(Self.Player)
+        draw.Highlight.FillColor = Color3.fromRGB(255, 255, 255)
+        draw.Highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+        draw.Highlight.FillTransparency = 0.5
+        draw.Highlight.OutlineTransparency = 0
+
+        Visuals.Drawings[Properties.Player] = Self
+        return Self
     end
 
     function Visuals:Remove()
@@ -518,7 +563,51 @@ RunService.RenderStepped:Connect(function()
     Fov.Position = Vector2.new(MousePos.x, MousePos.y)
     Fov.Visible = Toggles.SilentAimFov.Value
     Fov.Radius = Options.SilentAimFovSize.Value
+
+    if Toggles.Wsenabled.Value then
+		if Character:FindFirstChild("Humanoid") then
+        	Character.Humanoid.WalkSpeed = Options.WalkSpeed.Value
+		end
+	end
+    if Toggles.Jpenabled.Value then
+		if Character:FindFirstChild("Humanoid") then
+       		Character.Humanoid.JumpHeight = Options.Jumppowe1r.Value
+		end
+    end
+
+    local ClosestPlayer = Utils.GetClosestPlayerToMouse()
+    local headPosition = ClosestPlayer and ClosestPlayer and ClosestPlayer:FindFirstChild("Head")
+
+    Indicator.Position = UserInputService:GetMouseLocation() + Vector2.new(0,20)
+    Indicator.Visible = Toggles.Indicator.Value
+    Indicator.Text = ClosestPlayer and ClosestPlayer.Name or ''
+
+    Snap.From = UserInputService:GetMouseLocation()
+
+    if headPosition then
+        local headScreenPosition, onScreen = workspace.CurrentCamera:WorldToViewportPoint(headPosition.Position)
+        if onScreen then
+            Snap.To = Vector2.new(headScreenPosition.X, headScreenPosition.Y)
+            Snap.Visible = Toggles.SnapLines.Value
+        else
+            Snap.Visible = false
+        end
+    else
+        Snap.Visible = false
+    end
+
+    if Toggles.FullBright.Value then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    end 
+
+    if Toggles.NoFog.Value then Lighting.Atmosphere.Density = 0 Lighting.FogEnd = 100000 end 
+
 end)
+
 
 local Track = Instance.new("Animation")
 Track.AnimationId = "rbxassetid://10147821284"
@@ -537,7 +626,7 @@ RunService.Heartbeat:Connect(function()
     end
     pcall(function()
         Animation:Play(0, 1, 0)
-        Animation.TimePosition = 1.89
+        Animation.TimePosition = 1.9
     end)
 
 
@@ -549,8 +638,7 @@ RunService.Heartbeat:Connect(function()
         RunService.RenderStepped:Wait()
         Character.HumanoidRootPart.CFrame = OldHrp
         Character.HumanoidRootPart.AssemblyLinearVelocity = oldVel
-        Camera.CFrame += Vector3.new(0, Options.InvisibleOffSet.Value + math.pi, 0)
-
+        Camera.CFrame += Vector3.new(0, Options.InvisibleOffSet.Value + 3, 0)
     end
 end)
 
@@ -604,7 +692,7 @@ OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponMo
     end
 
     firePosition.CFrame = CFrame.new(
-        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value - 3, 0) or Vector3.new(0, 0, 0)),
+        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value - 2.1, 0) or Vector3.new(0, 0, 0)),
         Prediction or Closest[TargetPart].Position
     )
 
