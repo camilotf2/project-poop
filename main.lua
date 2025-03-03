@@ -16,12 +16,12 @@ local Lighting = Services.Lighting
 
 local Bullet = require(ReplicatedStorage.Modules.FPS.Bullet)
 local AmmoTypes = ReplicatedStorage.AmmoTypes
-local Detections = {10,13,8,9}
+local Detections = {2,3,4,6,7,8,9,10,12,13,14} 
 
 
 local Fov = Drawing.new("Circle") Fov.Thickness, Fov.NumSides, Fov.Filled, Fov.Color = 1.5, 360, false, Color3.fromRGB(255, 255, 255)
 local Indicator = Drawing.new('Text') Indicator.Center = true Indicator.Size = 15 Indicator.Font = 2 Indicator.Color = Color3.fromRGB(255, 255, 255) Indicator.Outline = true
-local Snap = Drawing.new('Line') Snap.Thickness = 1.5 Snap.Color = Color3.fromRGB(255, 255, 255) Snap.Visible = false
+local Snap = Drawing.new('Line') Snap.Thickness = 2.5 Snap.Color = Color3.fromRGB(255, 255, 255) Snap.Visible = false
 
 local Utils = {}
 do
@@ -634,7 +634,7 @@ RunService.Heartbeat:Connect(function()
         local OldHrp = Character.HumanoidRootPart.CFrame
         local oldVel = Character.HumanoidRootPart.AssemblyLinearVelocity
         Character.HumanoidRootPart.CFrame -= Vector3.new(0, Options.InvisibleOffSet.Value, 0)
-        Character.HumanoidRootPart.CFrame *= CFrame.Angles(0, 0, math.pi)
+        Character.HumanoidRootPart.CFrame *= CFrame.Angles(0, 0, math.rad(180))
         RunService.RenderStepped:Wait()
         Character.HumanoidRootPart.CFrame = OldHrp
         Character.HumanoidRootPart.AssemblyLinearVelocity = oldVel
@@ -650,7 +650,7 @@ Bypass = hookmetamethod(game,"__namecall", function(self, ...)
             local Args = {...}
             if table.find(Detections, Args[3]) then
                 print('Prevented detection')
-                return coroutine.yield()
+                return task.wait(9e9)
             end
         end
     return Bypass(self, ...)
@@ -692,7 +692,7 @@ OldCreateBullet = hookfunction(Bullet.CreateBullet, function(_, weapon, weaponMo
     end
 
     firePosition.CFrame = CFrame.new(
-        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value - 2.2, 0) or Vector3.new(0, 0, 0)),
+        firePosition.Position + (Toggles.Invisible.Value and Vector3.new(0, Options.InvisibleOffSet.Value - 2, 0) or Vector3.new(0, 0, 0)),
         Prediction or Closest[TargetPart].Position
     )
 
